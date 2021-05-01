@@ -1,4 +1,5 @@
 use {
+    crate::help::Help,
     koto::{bytecode::Chunk, Koto, KotoSettings},
     std::{
         fmt,
@@ -27,6 +28,7 @@ pub struct ReplSettings {
 pub struct Repl {
     koto: Koto,
     settings: ReplSettings,
+    help: Option<Help>,
     input: String,
     continued_lines: Vec<String>,
     input_history: Vec<String>,
@@ -258,8 +260,23 @@ impl Repl {
                         );
                     }
                     match self.koto.run() {
-                        Ok(result) => writeln!(stdout, "{}", result).unwrap(),
-                        Err(error) => self.print_error(stdout, tty, &error),
+                        Ok(result) => writeln!(stdout, "{}\n", result).unwrap(),
+                        Err(error) => {
+                            if input.trim() == "help" {
+                                let help = self.get_help(None);
+                                writeln!(stdout, "{}\n", help).unwrap();
+                            } else if input.starts_with("help") {
+                                match input.trim().splitn(2, char::is_whitespace).skip(1).next() {
+                                    Some(search) => {
+                                        let help = self.get_help(Some(search));
+                                        writeln!(stdout, "\n{}\n", help).unwrap();
+                                    }
+                                    _ => self.print_error(stdout, tty, &error),
+                                }
+                            } else {
+                                self.print_error(stdout, tty, &error)
+                            }
+                        }
                     }
                     self.continued_lines.clear();
                 }
@@ -318,6 +335,11 @@ impl Repl {
         self.input = " ".repeat(indent);
     }
 
+    fn get_help(&mut self, search: Option<&str>) -> String {
+        let help = self.help.get_or_insert_with(|| Help::new());
+        help.get_help(search)
+    }
+
     fn print_error<T, E>(&self, stdout: &mut Stdout, tty: &mut Option<RawTerminal<T>>, error: &E)
     where
         T: Write,
@@ -333,11 +355,11 @@ impl Repl {
             )
             .unwrap();
             tty.suspend_raw_mode().unwrap();
-            println!("{:#}", error);
+            println!("{:#}\n", error);
             tty.activate_raw_mode().unwrap();
             write!(tty, "{}", style::Reset).unwrap();
         } else {
-            write!(stdout, "{:#}", error).unwrap();
+            write!(stdout, "{:#}\n", error).unwrap();
         }
     }
 }
