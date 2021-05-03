@@ -6,9 +6,67 @@ The order in which items are added to the map will be preserved.
 
 ## Creating a map
 
+There are two ways to directly create a map in Koto:
+map blocks, and inline maps.
+
+### Block map syntax
+
+Maps can be created with indented blocks, where each line contains an entry of
+the form `Key: Value`.
+
+```koto
+x =
+  hello: -1
+  goodbye: 99
+
+x.hello
+# -1
+x.goodbye
+# 99
+```
+
+Nested Maps can be defined with additional indentation:
+
+```koto
+x =
+  hello:
+    world: 99
+    everybody: 123
+    to:
+      you: -1
+x.hello.world
+# 99
+x.hello.to.you
+# 123
+```
+
+### Inline map syntax
+
+Maps can also be created with curly braces, with comma-separated entries.
+
+```koto
+x = {hello: -1, goodbye: "abc"}
+x.hello
+# -1
+x.goodbye
+# abc
+```
+
+If only the key is provided for an entry, then a value matching the name of the
+key is looked for and is then copied into the entry.
+
+```koto
+hello = "abc"
+goodbye = 99
+x = {hello, goodbye, tschüss: 123}
+x.goodbye
+# 99
+```
+
 ## Keys
 
-Any non-container value type can be used as a key.
+When creating a Map directly, the keys are defined as strings.
+To use non-string values as keys, [`map.insert`](#insert) can be used.
 
 ```koto
 x = {}
@@ -18,9 +76,81 @@ x.insert true, "World"
 # Hello, World!
 ```
 
-## Maps as objects
+## Instance functions
 
-## Overloading operators
+When a Function is used as a value in a Map, and if it uses the keyword `self`
+as its first argument, then the runtime will pass the instance of the map that
+contains the function as the `self` argument.
+
+```koto
+x =
+  # Initialize an empty list
+  data: []
+  # Takes a value and adds it to the list
+  add_to_data: |self, n| self.data.push n
+  # Returns the sum of the list
+  sum: |self| self.data.sum()
+
+x.add_to_data 2
+x.add_to_data 20
+x.sum()
+# 22
+```
+
+## Operators
+
+The `+` operator can be used to merge two maps together.
+
+```koto
+x = {hello: 123}
+y = {goodbye: 99}
+x + y
+# {hello, goodbye}
+```
+
+### Meta Maps and overloaded operations
+
+Maps can be used to create value types with custom behaviour.
+
+Keys with `@` prefixes go into the map's 'meta map',
+which is checked when the map is encountered in operations.
+
+```koto
+make_x = |n|
+  data: n
+  # Overloading the addition operator
+  @+: |self, other|
+    # a new instance is made with the result of adding the two values together
+    make_x self.data + other.data
+  # Overloading the subtraction operator
+  @-: |self, other|
+    make_x self.data - other.data
+
+x1 = make_x 10
+x2 = make_x 20
+
+(x1 + x2).data
+# 30
+(x1 - x2).data
+# -10
+```
+
+All binary operators can be overloaded following this pattern.
+
+Additionally, the following meta functions can customize object behaviour:
+
+- `@negate`
+  - Overloads the unary negation operator:
+    - `@negate: |self| make_x -self.data`
+- `@index`
+  - Overloads `[]` indexing:
+    - `@index: |self, index| self.data + index`
+- `@display`
+  - Customizes how the map will be displayed when formatted as a string:
+    - `@display: |self| "X: {}".format self.data`
+- `@type`
+  - Provides a String that's used when checking the map's type:
+    - `@type: "X"`
 
 # Reference
 
